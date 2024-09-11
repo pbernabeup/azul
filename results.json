@@ -1,0 +1,34 @@
+{
+    "dummy": {
+        "dummy": {
+            "wins": 49227,
+            "losses": 49258,
+            "ties": 1515,
+            "avg_first": 18.98905,
+            "avg_second": 19.01019
+        },
+        "greedy": {
+            "wins": 1614,
+            "losses": 98176,
+            "ties": 210,
+            "avg_first": 5.10395,
+            "avg_second": 39.96562
+        }
+    },
+    "greedy": {
+        "dummy": {
+            "wins": 98459,
+            "losses": 1342,
+            "ties": 199,
+            "avg_first": 40.23295,
+            "avg_second": 4.90419
+        },
+        "greedy": {
+            "wins": 54207,
+            "losses": 43533,
+            "ties": 2260,
+            "avg_first": 33.43689,
+            "avg_second": 30.90086
+        }
+    }
+}
