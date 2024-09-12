@@ -1,8 +1,7 @@
-import json
-import os
 import random
-import sys
-from tqdm import tqdm
+
+from AzulCPU import AzulCPU
+
 
 class Tile:
     def __init__(self, color):
@@ -24,198 +23,10 @@ class Player:
         self.score = 0
 
 
-class AzulAI:
-    def __init__(self, game, algorithm):
-        self.game = game
-        self.algorithm = algorithm
-
-    def choose_move(self):
-        if self.algorithm == 'dummy':
-            return self.dummy_algorithm()
-        elif self.algorithm == 'greedy':
-            return self.greedy_algorithm()
-        elif self.algorithm == 'smart':
-            return self.smart_algorithm()
-        else:
-            return self.strategic_algorithm()
-
-    def dummy_algorithm(self):
-        # Simple AI logic: choose the first available source and color, and the widest valid line
-        for source in self.game.factories + [self.game.center]:
-            chosen_color = next((tile.color for tile in source.tiles if tile.color != '1'), None)
-            if chosen_color:
-                player = self.game.players[self.game.active_player]
-                valid_lines = self.game.get_valid_lines(player, chosen_color)
-                chosen_line = max(valid_lines) if valid_lines else -1
-                return source, chosen_color, chosen_line
-
-    def greedy_algorithm(self):
-        best_move = None
-        largest = 0
-        least = float('inf')
-        player = self.game.players[self.game.active_player]
-
-        for source in self.game.factories + [self.game.center]:
-            for color in set(tile.color for tile in source.tiles if tile.color != '1'):
-                tiles = [tile for tile in source.tiles if tile.color == color]
-                for line_index in self.game.get_valid_lines(player, color):
-                    spaces = line_index + 1 - len(player.pattern_lines[line_index])
-                    if len(tiles) <= spaces:
-                        if len(tiles) > largest:
-                            largest = len(tiles)
-                            best_move = (source, color, line_index)
-                            least = 0
-                    elif least != 0:
-                        tiles_too_many = abs(spaces - len(tiles))
-                        if tiles_too_many < least:
-                            least = tiles_too_many
-                            best_move = (source, color, line_index)
-
-        # If no best_move found, choose the move that moves the least tiles to the floor line
-        if not best_move:
-            best_move = self.find_least_negative()
-
-        return best_move
-
-    def smart_algorithm(self):
-        best_move = None
-        least_whitespace = float('inf')
-        most_tiles = 0
-        move_found = False
-        player = self.game.players[self.game.active_player]
-
-        for source in self.game.factories + [self.game.center]:
-            for color in set(tile.color for tile in source.tiles if tile.color != '1'):
-                tiles = [tile for tile in source.tiles if tile.color == color]
-                for line_index in self.game.get_valid_lines(player, color):
-                    spaces = line_index + 1 - len(player.pattern_lines[line_index])
-                    if len(tiles) <= spaces:
-                        move_found = True
-                        whitespace = spaces - len(tiles)
-                        if whitespace <= least_whitespace:
-                            if whitespace < least_whitespace:
-                                least_whitespace = whitespace
-                                best_move = None
-                            if not best_move or self.has_adjacent(player, line_index, color):
-                                best_move = (source, color, line_index)
-                            elif len(tiles) > most_tiles:
-                                best_move = (source, color, line_index)
-                                most_tiles = len(tiles)
-
-        if not move_found:
-            best_move = self.find_least_overflow(player)
-
-        return best_move if best_move else (None, None, None)
-
-    def strategic_algorithm(self):
-        best_move = None
-        least_whitespace = float('inf')
-        most_tiles = 0
-        move_found = False
-        diagonal_move = False
-        two_adjacent_move = False
-        one_adjacent_move = False
-        player = self.game.players[self.game.active_player]
-
-        for source in self.game.factories + [self.game.center]:
-            for color in set(tile.color for tile in source.tiles if tile.color != '1'):
-                tiles = [tile for tile in source.tiles if tile.color == color]
-                for line_index in self.game.get_valid_lines(player, color):
-                    spaces = line_index + 1 - len(player.pattern_lines[line_index])
-                    if len(tiles) <= spaces:
-                        move_found = True
-                        whitespace = spaces - len(tiles)
-                        if whitespace <= least_whitespace:
-                            if whitespace < least_whitespace:
-                                least_whitespace = whitespace
-                                best_move = None
-                                diagonal_move = two_adjacent_move = one_adjacent_move = False
-
-                            if not diagonal_move and self.game.round_num == 1:
-                                if self.is_move_in_diagonal(line_index, color):
-                                    best_move = (source, color, line_index)
-                                    diagonal_move = True
-                            elif not two_adjacent_move:
-                                adj = self.check_adjacents(player, line_index, color)
-                                if adj['horizontal'] and adj['vertical']:
-                                    best_move = (source, color, line_index)
-                                    two_adjacent_move = True
-                            elif not one_adjacent_move:
-                                adj = self.check_adjacents(player, line_index, color)
-                                if adj['horizontal'] or adj['vertical']:
-                                    best_move = (source, color, line_index)
-                                    one_adjacent_move = True
-                            elif len(tiles) > most_tiles:
-                                best_move = (source, color, line_index)
-                                most_tiles = len(tiles)
-
-        if not move_found:
-            best_move = self.find_least_overflow(player)
-
-        return best_move if best_move else (None, None, None)
-
-    def find_least_overflow(self, player):
-        best_move = None
-        least_overflow = float('inf')
-
-        for source in self.game.factories + [self.game.center]:
-            for color in set(tile.color for tile in source.tiles if tile.color != '1'):
-                tiles = [tile for tile in source.tiles if tile.color == color]
-                for line_index, line in enumerate(player.pattern_lines):
-                    if not line or line[0].color == color:
-                        spaces = line_index + 1 - len(line)
-                        overflow = max(0, len(tiles) - spaces)
-                        if overflow < least_overflow:
-                            least_overflow = overflow
-                            best_move = (source, color, line_index)
-
-        return best_move
-    
-    def find_least_negative(self):
-        min_floor_tiles = float('inf')
-
-        for source in self.game.factories + [self.game.center]:
-            for color in set(tile.color for tile in source.tiles if tile.color != '1'):
-                tiles = [tile for tile in source.tiles if tile.color == color]
-                if len(tiles) < min_floor_tiles:
-                    min_floor_tiles = len(tiles)
-                    best_move = (source, color, -1)
-
-        return best_move
-    
-    def has_adjacent(self, game, player, line_index, color):
-        if game.mode == 'pattern':
-            col = game.wall_pattern[line_index].index(color)
-        else:
-            col = next((j for j in range(5) if player.wall[line_index][j] is None and all(player.wall[k][j] != color for k in range(5))), None)
-            if col is None:
-                return False
-
-        return self.check_adjacents(game, player, line_index, color, col)
-
-    def check_adjacents(self, game, player, row, color, col=None):
-        if col is None:
-            if game.mode == 'pattern':
-                col = game.wall_pattern[row].index(color)
-            else:
-                col = next((j for j in range(5) if player.wall[row][j] is None and all(player.wall[k][j] != color for k in range(5))), None)
-                if col is None:
-                    return {'horizontal': False, 'vertical': False}
-
-        horizontal = (col > 0 and player.wall[row][col-1]) or (col < 4 and player.wall[row][col+1])
-        vertical = (row > 0 and player.wall[row-1][col]) or (row < 4 and player.wall[row+1][col])
-
-        return {'horizontal': horizontal, 'vertical': vertical}
-
-    def is_move_in_diagonal(self, game, row, color):
-        return row == game.wall_pattern[row].index(color) if game.mode == 'pattern' else row == color
-
-
-
 class AzulGame:
     def __init__(self, num_players, mode='pattern', verbose=True):
         self.players = [Player(f"Player {i+1}") for i in range(num_players)]
-        self.ai = [AzulAI(self, "dummy"), AzulAI(self, "dummy")]
+        self.ai = [AzulCPU(self, "dummy") for _ in range(num_players)]
 
         self.factories = [Source(f"Factory {i+1}") for i in range(num_players * 2 + 1)]
         self.center = Source("Center")
@@ -253,7 +64,7 @@ class AzulGame:
             player = self.players[self.active_player]
             if self.verbose:
                 self.display_game_state()
-            self.play_turn(player, is_ai=True)
+            self.play_turn(player, is_ai=(self.ai[self.active_player] is not None))
             self.active_player = (self.active_player + 1) % len(self.players)
 
     def play_turn(self, player, is_ai=False):
@@ -320,17 +131,17 @@ class AzulGame:
             print(f"Center: {' '.join(tile.color for tile in self.center.tiles)}")
 
     def get_user_source_choice(self):
-        valid_factories = [factory for factory in self.factories if factory.tiles]
+        valid_factories = [factory.name[-1] for factory in self.factories if factory.tiles]
         while True:
             if valid_factories:
                 if self.is_center_valid_choice():
-                    choice = input(f"Choose a factory ({', '.join([factory.name[-1] for factory in valid_factories])}) or C for center: ").upper()
+                    choice = input(f"Choose a factory ({', '.join(valid_factories)}) or C for center: ").upper()
                     if choice == 'C' and self.center:
                         return self.center
                     elif choice in valid_factories:
                         return self.factories[int(choice) - 1]
                 else:
-                    choice = input(f"Choose a factory ({', '.join([factory.name[-1] for factory in valid_factories])}): ")
+                    choice = input(f"Choose a factory ({', '.join(valid_factories)}): ")
                     if choice in valid_factories:
                         return self.factories[int(choice) - 1]
             else:
@@ -518,58 +329,3 @@ class AzulGame:
             print(f"\nThe winner is {winner.name} with a score of {winner.score}!")
 
         return self.players
-
-# Run the game
-mode = sys.argv[1]
-strategies = ["smart", "dummy"]
-
-if mode == "play":
-    game = AzulGame(2, mode='pattern')
-    game.ai = [AzulAI(game, strategies[0]), AzulAI(game, strategies[1])]
-    game.play_game()
-
-elif mode == "simulate":
-    total_games = 100000
-
-    results = [0, 0, 0]
-    total_scores = [0, 0]
-
-    for _ in tqdm(range(total_games)):
-        game = AzulGame(2, mode='pattern', verbose=False)
-        game.ai = [AzulAI(game, strategies[0]), AzulAI(game, strategies[1])]
-        players = game.play_game()
-
-        total_scores[0] += players[0].score
-        total_scores[1] += players[1].score
-
-        if players[0].score > players[1].score:
-            results[0] += 1
-        elif players[1].score > players[0].score:
-            results[1] += 1
-        else:
-            results[2] += 1
-    
-    if os.path.exists("results.json"):
-        with open("results.json", 'r') as f:
-            data = json.load(f)
-    else:
-        data = {}
-
-    first, second = strategies
-
-    if first not in data:
-        data[first] = {}
-    
-    if second not in data[first]:
-        data[first][second] = {}
-
-    data[first][second] = {
-        "wins": results[0],
-        "losses": results[1],
-        "ties": results[2],
-        "avg_first": total_scores[0] / total_games,
-        "avg_second": total_scores[1] / total_games,
-    }
-
-    with open("results.json", 'w') as f:
-        json.dump(data, f, indent=4)

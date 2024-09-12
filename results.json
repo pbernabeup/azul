@@ -1,34 +1,122 @@
 {
     "dummy": {
         "dummy": {
-            "wins": 49227,
-            "losses": 49258,
-            "ties": 1515,
-            "avg_first": 18.98905,
-            "avg_second": 19.01019
+            "wins": 49225,
+            "losses": 49227,
+            "ties": 1548,
+            "avg_first": 19.01862,
+            "avg_second": 19.01144
         },
         "greedy": {
-            "wins": 1614,
-            "losses": 98176,
-            "ties": 210,
-            "avg_first": 5.10395,
-            "avg_second": 39.96562
+            "wins": 9324,
+            "losses": 89688,
+            "ties": 988,
+            "avg_first": 5.47488,
+            "avg_second": 24.7865
+        },
+        "smart": {
+            "wins": 264,
+            "losses": 99695,
+            "ties": 41,
+            "avg_first": 4.97093,
+            "avg_second": 54.63056
+        },
+        "strategic": {
+            "wins": 127,
+            "losses": 99849,
+            "ties": 24,
+            "avg_first": 5.14118,
+            "avg_second": 61.39006
         }
     },
     "greedy": {
         "dummy": {
-            "wins": 98459,
-            "losses": 1342,
-            "ties": 199,
-            "avg_first": 40.23295,
-            "avg_second": 4.90419
+            "wins": 89974,
+            "losses": 9071,
+            "ties": 955,
+            "avg_first": 24.14255,
+            "avg_second": 5.17575
         },
         "greedy": {
-            "wins": 54207,
-            "losses": 43533,
-            "ties": 2260,
-            "avg_first": 33.43689,
-            "avg_second": 30.90086
+            "wins": 51537,
+            "losses": 44874,
+            "ties": 3589,
+            "avg_first": 14.31809,
+            "avg_second": 13.00425
+        },
+        "smart": {
+            "wins": 9880,
+            "losses": 89240,
+            "ties": 880,
+            "avg_first": 21.20345,
+            "avg_second": 47.43236
+        },
+        "strategic": {
+            "wins": 7820,
+            "losses": 91473,
+            "ties": 707,
+            "avg_first": 22.74132,
+            "avg_second": 51.82034
+        }
+    },
+    "smart": {
+        "dummy": {
+            "wins": 99799,
+            "losses": 174,
+            "ties": 27,
+            "avg_first": 55.89153,
+            "avg_second": 4.47353
+        },
+        "greedy": {
+            "wins": 90209,
+            "losses": 8980,
+            "ties": 811,
+            "avg_first": 48.44752,
+            "avg_second": 21.15893
+        },
+        "smart": {
+            "wins": 54348,
+            "losses": 43920,
+            "ties": 1732,
+            "avg_first": 51.12055,
+            "avg_second": 47.99254
+        },
+        "strategic": {
+            "wins": 39921,
+            "losses": 58404,
+            "ties": 1675,
+            "avg_first": 50.23839,
+            "avg_second": 55.61542
+        }
+    },
+    "strategic": {
+        "dummy": {
+            "wins": 99908,
+            "losses": 80,
+            "ties": 12,
+            "avg_first": 62.50288,
+            "avg_second": 4.66489
+        },
+        "greedy": {
+            "wins": 92885,
+            "losses": 6465,
+            "ties": 650,
+            "avg_first": 53.02165,
+            "avg_second": 22.23236
+        },
+        "smart": {
+            "wins": 65782,
+            "losses": 32667,
+            "ties": 1551,
+            "avg_first": 58.3155,
+            "avg_second": 48.38077
+        },
+        "strategic": {
+            "wins": 51504,
+            "losses": 46839,
+            "ties": 1657,
+            "avg_first": 55.90567,
+            "avg_second": 54.56537
         }
     }
 }
