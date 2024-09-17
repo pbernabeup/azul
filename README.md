@@ -18,7 +18,7 @@ Azul is an abstract strategy board game where players compete to create the most
 1. Make sure you have Python 3.x installed on your system.
 2. Clone this repository:
    ```
-   git clone https://github.com/yourusername/azul.git
+   git clone https://github.com/pbernabeup/azul.git
    ```
 3. Navigate to the project directory:
    ```
@@ -50,5 +50,6 @@ Contributions to Azul CLI are welcome! If you find any bugs, have suggestions fo
 ## Acknowledgements
 
 - Azul game design by Michael Kiesling
+- Greedy, smart and strategic CPU strategies based on "Achieving the maximal score in Azul" by Sara Kooistra
 
 Enjoy playing Azul in your terminal!
