@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Entry point for the Azul game."""
 import argparse
-import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from tqdm import tqdm
 
@@ -15,6 +13,7 @@ if __name__ == "__main__":
     sys.path.insert(0, src_dir)
 
 from src.azul.cpu import AzulCPU
+from src.azul.elo import EloSystem
 from src.azul.game import AzulGame
 
 STRATEGIES = ["dummy", "greedy", "smart", "strategic"]
@@ -61,20 +60,56 @@ def play_game(args: Optional[argparse.Namespace] = None) -> None:
     game.play_game()
 
 
-def simulate_games(num_games: int = 100000) -> None:
-    """Run AI simulations to test different strategies.
+def simulate_games(
+    num_games: int = 100000,
+    ratings_file: str = "analysis/elo_ratings.json",
+    reset: bool = False,
+    test_strategies: Optional[List[str]] = None,
+) -> None:
+    """Run AI simulations to test different strategies using ELO ratings.
 
     Args:
         num_games: Number of games to simulate for each strategy pair
+        ratings_file: Path to the ratings file to load/save
+        reset: Whether to reset all ratings to default
+        test_strategies: Optional list of strategies to test. If provided, only these
+            strategies will play against each other and existing ones.
     """
-    for first_strategy in STRATEGIES:
-        for second_strategy in STRATEGIES:
-            print(f"\nSimulating: {first_strategy} vs {second_strategy}")
+    elo = EloSystem(ratings_file=ratings_file)
+    if reset:
+        elo.players.clear()
 
-            results = [0, 0, 0]  # wins, losses, ties
-            total_scores = [0, 0]
+    # Determine which strategies to test
+    strategies_to_test = test_strategies if test_strategies else STRATEGIES
+    all_strategies = sorted(set(list(elo.players.keys()) + strategies_to_test))
 
-            for _ in tqdm(range(num_games), desc="Games"):
+    # Generate matchups
+    matchups = []
+    for first_strategy in strategies_to_test:
+        for second_strategy in all_strategies:
+            if first_strategy >= second_strategy:  # Only play each matchup once
+                continue
+            matchups.append((first_strategy, second_strategy))
+
+    if not matchups:
+        print("No valid matchups found!")
+        return
+
+    total_games = num_games * len(matchups) * 2  # *2 because each plays both sides
+    print(f"\nRunning {total_games} total games across {len(matchups)} matchups")
+    print(f"Each matchup will play {num_games} games in each configuration")
+    print(f"Testing strategies: {', '.join(strategies_to_test)}")
+    if test_strategies:
+        print(
+            f"Against existing strategies: {', '.join(sorted(set(all_strategies) - set(strategies_to_test)))}\n"
+        )
+    print()
+
+    with tqdm(total=total_games, desc="Total Progress") as pbar:
+        # Run games in rounds, playing one game from each matchup
+        for game_num in range(num_games):
+            for first_strategy, second_strategy in matchups:
+                # Play one game in first configuration
                 game = AzulGame(2, mode="pattern", verbose=False)
                 game.ai = [
                     AzulCPU(game, first_strategy),
@@ -82,104 +117,124 @@ def simulate_games(num_games: int = 100000) -> None:
                 ]
                 players = game.play_game()
 
-                total_scores[0] += players[0].score
-                total_scores[1] += players[1].score
-
+                # Determine game outcome from first player's perspective
                 if players[0].score > players[1].score:
-                    results[0] += 1
+                    score = 1.0  # First player won
                 elif players[1].score > players[0].score:
-                    results[1] += 1
+                    score = 0.0  # First player lost
                 else:
-                    results[2] += 1
+                    score = 0.5  # Draw
 
-            save_simulation_results(
-                first_strategy, second_strategy, results, total_scores, num_games
-            )
+                # Update ELO ratings
+                elo.update_ratings(first_strategy, second_strategy, score)
+                pbar.update(1)
+
+                # Play one game in reverse configuration
+                game = AzulGame(2, mode="pattern", verbose=False)
+                game.ai = [
+                    AzulCPU(game, second_strategy),
+                    AzulCPU(game, first_strategy),
+                ]
+                players = game.play_game()
+
+                # Update ELO ratings for reverse matchup
+                if players[0].score > players[1].score:
+                    score = 0.0  # First strategy lost
+                elif players[1].score > players[0].score:
+                    score = 1.0  # First strategy won
+                else:
+                    score = 0.5  # Draw
+
+                elo.update_ratings(first_strategy, second_strategy, score)
+                pbar.update(1)
+
+            # Print current ratings every 10% of games
+            if game_num % (num_games // 10) == 0:
+                print(f"\nRatings after {game_num * len(matchups) * 2} games:")
+                print(elo.get_ratings_table())
+
+    # Print final ratings
+    print("\nFinal Ratings:")
+    print(elo.get_ratings_table())
 
 
-def save_simulation_results(
-    first_strategy: str,
-    second_strategy: str,
-    results: List[int],
-    total_scores: List[int],
-    num_games: int,
+def run_elo_tournament(
+    games_per_matchup: int = 1000,
+    ratings_file: str = "analysis/elo_ratings.json",
+    reset: bool = False,
+    test_strategies: Optional[List[str]] = None,
 ) -> None:
-    """Save simulation results to a JSON file.
+    """Run a complete ELO rating tournament between all strategies.
 
     Args:
-        first_strategy: Name of the first AI strategy
-        second_strategy: Name of the second AI strategy
-        results: List of [wins, losses, ties]
-        total_scores: List of total scores for each player
-        num_games: Number of games simulated
+        games_per_matchup: Number of games to play for each strategy pair
+        ratings_file: Path to the ratings file to load/save
+        reset: Whether to reset all ratings to default
+        test_strategies: Optional list of strategies to test
     """
-    # Ensure analysis directory exists
-    os.makedirs("analysis", exist_ok=True)
-    results_file = "analysis/results.json"
+    print("Starting ELO rating tournament...")
+    print(
+        f"Playing {games_per_matchup} games per matchup (doubled for playing both sides)"
+    )
 
-    if os.path.exists(results_file):
-        with open(results_file, "r") as f:
-            all_data: Dict = json.load(f)
-    else:
-        all_data = {}
-
-    if first_strategy not in all_data:
-        all_data[first_strategy] = {}
-
-    all_data[first_strategy][second_strategy] = {
-        "wins": results[0],
-        "losses": results[1],
-        "ties": results[2],
-        "avg_first": total_scores[0] / num_games,
-        "avg_second": total_scores[1] / num_games,
-    }
-
-    with open(results_file, "w") as f:
-        json.dump(all_data, f, indent=4)
+    simulate_games(
+        num_games=games_per_matchup,
+        ratings_file=ratings_file,
+        reset=reset,
+        test_strategies=test_strategies,
+    )
 
 
 def main() -> None:
     """Run the main entry point with command line argument parsing."""
-    parser = argparse.ArgumentParser(description="Play or simulate Azul games")
-
-    # Create subparsers for different modes
-    subparsers = parser.add_subparsers(dest="command", help="Command to run")
-
-    # Play command
-    play_parser = subparsers.add_parser("play", help="Play an interactive game")
-    play_parser.add_argument(
-        "--players",
+    parser = argparse.ArgumentParser(description="Azul Game")
+    parser.add_argument(
+        "--players", type=int, default=2, help="Number of players (2-5)"
+    )
+    parser.add_argument(
+        "--mode", type=str, default="pattern", help="Game mode (pattern or free)"
+    )
+    parser.add_argument("--difficulty", type=int, default=1, help="AI difficulty (1-4)")
+    parser.add_argument(
+        "--simulate", action="store_true", help="Run strategy simulations"
+    )
+    parser.add_argument("--elo", action="store_true", help="Run ELO rating tournament")
+    parser.add_argument(
+        "--games",
         type=int,
-        default=None,
-        choices=range(2, 6),
-        help="Number of players (2-5)",
+        default=1000,
+        help="Number of games per matchup in tournaments",
     )
-    play_parser.add_argument(
-        "--mode", choices=["pattern", "free"], default=None, help="Game mode"
+    parser.add_argument(
+        "--ratings-file",
+        type=str,
+        default="analysis/elo_ratings.json",
+        help="Path to the ratings file",
     )
-    play_parser.add_argument(
-        "--difficulty",
-        type=int,
-        choices=range(1, 5),
-        default=None,
-        help="AI difficulty (1-4)",
+    parser.add_argument(
+        "--reset", action="store_true", help="Reset all ratings to default"
     )
-
-    # Simulate command
-    sim_parser = subparsers.add_parser("simulate", help="Run AI strategy simulations")
-    sim_parser.add_argument(
-        "--games", type=int, default=100000, help="Number of games to simulate"
+    parser.add_argument(
+        "--test-strategies",
+        type=str,
+        nargs="+",
+        choices=STRATEGIES,
+        help="Only test specific strategies",
     )
 
     args = parser.parse_args()
 
-    if args.command == "play":
-        play_game(args if any(vars(args).values()) else None)
-    elif args.command == "simulate":
+    if args.simulate:
         simulate_games(args.games)
+    elif args.elo:
+        run_elo_tournament(
+            games_per_matchup=args.games,
+            ratings_file=args.ratings_file,
+            reset=args.reset,
+            test_strategies=args.test_strategies,
+        )
     else:
-        # No command specified, run interactive play mode
-        play_game()
+        play_game(args)
 
 
 if __name__ == "__main__":
