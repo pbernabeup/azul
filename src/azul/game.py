@@ -1,9 +1,8 @@
 """Main game module for Azul."""
 
 import random
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
-from .cpu import AzulCPU
 from .display import Display
 from .game_logic import GameLogic
 from .models import Player, Source, Tile
@@ -20,26 +19,11 @@ class AzulGame:
             mode: Game mode ('pattern' or 'free')
             verbose: Whether to display game state
         """
-        self.players = [Player(f"Player {i+1}") for i in range(num_players)]
-        self.ai: List[Optional[AzulCPU]] = [
-            AzulCPU(self, "dummy") for _ in range(num_players)
-        ]
-        self.factories = [Source(f"Factory {i+1}") for i in range(num_players * 2 + 1)]
-        self.center = Source("Center")
-        self.bag: List[Tile] = []
-        self.discard: List[Tile] = []
-
-        self.round_num = 1
-        self.active_player = 0
-        self.first_player_token = 0
         self.mode = mode
         self.verbose = verbose
         self.display = Display()
         self.logic = GameLogic()
         self.colors = ["R", "B", "Y", "K", "W"]  # Red, Blue, Yellow, blacK, White
-
-        # Initialize center with first player token
-        self.center.tiles = [Tile("1")]
 
         if mode == "pattern":
             self.wall_pattern = [
@@ -51,6 +35,20 @@ class AzulGame:
             ]
         else:
             self.wall_pattern = [[None for _ in range(5)] for _ in range(5)]
+
+        self.players = [Player(f"Player {i+1}") for i in range(num_players)]
+        self.ai = [None] * num_players  # Initialize AI list with None values
+        self.factories = [Source(f"Factory {i+1}") for i in range(num_players * 2 + 1)]
+        self.center = Source("Center")
+        self.bag: List[Tile] = []
+        self.discard: List[Tile] = []
+
+        self.round_num = 1
+        self.active_player = 0
+        self.first_player_token = 0
+
+        # Initialize center with first player token
+        self.center.tiles = [Tile("1")]
 
     def setup_game(self) -> None:
         """Set up the initial game state."""
@@ -66,6 +64,13 @@ class AzulGame:
         Returns:
             List of players with their final scores
         """
+        from .cpu import AzulCPU  # Lazy import to avoid circular dependency
+
+        # Initialize AI players after import
+        for i in range(len(self.players)):
+            if self.ai[i] is None:
+                self.ai[i] = AzulCPU(self, "dummy")
+
         self.setup_game()
         while not self.is_game_over():
             if self.verbose:
